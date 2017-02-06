@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">KamcordVideosFeed</string>
+    <string name="noInternet">NO INTERNET CONNECTION</string>
+    <string name="reconnect">TAP To TRY AGAIN</string>
+</resources>
