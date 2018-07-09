@@ -1,0 +1,10 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Save button icon -->
+    <item
+        android:id="@+id/action_save"
+        android:icon="@mipmap/save_button"
+        android:title="Save"
+        app:showAsAction="ifRoom"/>
+</menu>
