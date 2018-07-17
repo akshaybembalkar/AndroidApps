@@ -12,6 +12,9 @@ public class Location {
     @ColumnInfo(name = "location_id")
     private String location_id;
 
+    @ColumnInfo(name = "searchString")
+    private String searchString;
+
     @ColumnInfo(name = "formatted_address")
     private String formattedAddress;
 

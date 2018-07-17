@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
@@ -12,6 +13,8 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import com.ab.searchgooglemapsapi.adapter.CustomAdapter;
+import com.ab.searchgooglemapsapi.database.LocationDatabase;
+import com.ab.searchgooglemapsapi.database.SingletonInstance;
 import com.ab.searchgooglemapsapi.retrofit_models.AddressList;
 import com.ab.searchgooglemapsapi.retrofit_models.AddressModel;
 import com.ab.searchgooglemapsapi.network.RetrofitClientInstance;
@@ -31,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private ListView locationList;
     private EditText searchField;
     private static List<AddressModel> addressList;
+    private LocationDatabase locationDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,11 +46,17 @@ public class MainActivity extends AppCompatActivity {
         locationList = findViewById(R.id.locationList);
         searchField = findViewById(R.id.searchField);
 
+        // get singleton instance of database
+        locationDatabase = SingletonInstance.getDbInstance(getApplicationContext());
         addressList = new ArrayList<>();
 
         searchButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                // Hide soft keyboard
+                InputMethodManager inputManager = (InputMethodManager) getSystemService(getApplicationContext().INPUT_METHOD_SERVICE);
+                inputManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
+
                 String locationName = searchField.getText().toString();
                 searchLocation(locationName);
             }
@@ -110,5 +120,10 @@ public class MainActivity extends AppCompatActivity {
         addressList = list.getAddressList();
         adapter = new CustomAdapter(this, addressList);
         locationList.setAdapter(adapter);
+        if (addressList.size() > 1) {
+            displayAllButton.setVisibility(View.VISIBLE);
+        } else {
+            displayAllButton.setVisibility(View.GONE);
+        }
     }
 }

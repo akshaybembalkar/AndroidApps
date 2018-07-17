@@ -1,6 +1,7 @@
 package com.ab.searchgooglemapsapi;
 
 import android.arch.persistence.room.Room;
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.AsyncTask;
@@ -11,10 +12,13 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.ab.searchgooglemapsapi.database.Location;
 import com.ab.searchgooglemapsapi.database.LocationDatabase;
+import com.ab.searchgooglemapsapi.database.SingletonInstance;
 import com.ab.searchgooglemapsapi.retrofit_models.AddressModel;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -39,6 +43,9 @@ public class GoogleMapsActivity extends AppCompatActivity implements OnMapReadyC
     private String locationId;
     private static List<AddressModel> addressList;
     private Location savedLocation;
+    private Menu menu;
+    private Context mContext;
+    private ProgressBar progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,15 +66,17 @@ public class GoogleMapsActivity extends AppCompatActivity implements OnMapReadyC
                 (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
-        locationDatabase = Room.databaseBuilder(getApplicationContext(),
-                LocationDatabase.class, "location-db").build();
+        mContext = this;
+        progressBar = findViewById(R.id.loadingData);
+//        locationDatabase = Room.databaseBuilder(getApplicationContext(),
+//                LocationDatabase.class, "location-db").build();
+        locationDatabase = SingletonInstance.getDbInstance(getApplicationContext());
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-
-        new RetrieveTask(GoogleMapsActivity.this, locationId).execute();
+        new RetrieveLocation(GoogleMapsActivity.this, locationId).execute();
     }
 
     @Override
@@ -148,11 +157,28 @@ public class GoogleMapsActivity extends AppCompatActivity implements OnMapReadyC
         });
     }
 
+    public void onSuccessfulInsert() {
+        MenuItem item = menu.findItem(R.id.action_save);
+        item.setVisible(false);
+
+        getMenuInflater().inflate(R.menu.action_bar_menu_delete, menu);
+    }
+
+    public void onSuccessfulDelete() {
+        MenuItem item = menu.findItem(R.id.action_delete);
+        item.setVisible(false);
+
+        getMenuInflater().inflate(R.menu.action_bar_menu_save, menu);
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        this.menu = menu;
         if (savedLocation == null) {
-            getMenuInflater().inflate(R.menu.action_bar_menu_save, menu);
-        } else {
+            if ( addressList == null) {
+                getMenuInflater().inflate(R.menu.action_bar_menu_save, menu);
+            }
+        } else if (addressList == null) {
             getMenuInflater().inflate(R.menu.action_bar_menu_delete, menu);
         }
         return super.onCreateOptionsMenu(menu);
@@ -167,7 +193,10 @@ public class GoogleMapsActivity extends AppCompatActivity implements OnMapReadyC
                 location.setFormattedAddress(address);
                 location.setLatitude(latitude);
                 location.setLongitude(longitude);
-                new InsertTask(GoogleMapsActivity.this, location).execute();
+                new InsertLocation(GoogleMapsActivity.this, location).execute();
+                return true;
+            case R.id.action_delete:
+                new DeleteLocation(GoogleMapsActivity.this, locationId).execute();
                 return true;
             case android.R.id.home:
                 // app icon in action bar clicked; goto parent activity.
@@ -179,13 +208,60 @@ public class GoogleMapsActivity extends AppCompatActivity implements OnMapReadyC
         }
     }
 
-    private static class InsertTask extends AsyncTask<Void, Void, Boolean> {
+    /**
+     * Delete location in database
+     */
+    private static class DeleteLocation extends AsyncTask<Void,Void,Boolean> {
+
+        private WeakReference<GoogleMapsActivity> activityReference;
+        private String locationId;
+
+        DeleteLocation(GoogleMapsActivity context, String locationId) {
+            activityReference = new WeakReference<>(context);
+            this.locationId = locationId;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            activityReference.get().progressBar.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            activityReference.get().locationDatabase.locationDao().delete(locationId);
+            return true;
+        }
+
+        @Override
+        protected void onPostExecute(Boolean result) {
+            super.onPostExecute(result);
+            activityReference.get().progressBar.setVisibility(View.GONE);
+            if (result) {
+                Toast.makeText(activityReference.get().mContext, "Deleted successfully", Toast.LENGTH_LONG).show();
+                activityReference.get().onSuccessfulDelete();
+            } else {
+                Toast.makeText(activityReference.get().mContext, "Failed to delete", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    /**
+     * Save location in database
+     */
+    private static class InsertLocation extends AsyncTask<Void, Void, Boolean> {
         private WeakReference<GoogleMapsActivity> activityReference;
         private Location location;
 
-        InsertTask(GoogleMapsActivity context, Location location) {
+        InsertLocation(GoogleMapsActivity context, Location location) {
             activityReference = new WeakReference<>(context);
             this.location = location;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            activityReference.get().progressBar.setVisibility(View.VISIBLE);
         }
 
         @Override
@@ -197,16 +273,26 @@ public class GoogleMapsActivity extends AppCompatActivity implements OnMapReadyC
         @Override
         protected void onPostExecute(Boolean result) {
             super.onPostExecute(result);
+            if (result) {
+                activityReference.get().progressBar.setVisibility(View.GONE);
+                Toast.makeText(activityReference.get().mContext, "Inserted successfully", Toast.LENGTH_LONG).show();
+                activityReference.get().onSuccessfulInsert();
+            } else {
+                Toast.makeText(activityReference.get().mContext, "Failed to insert", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
-    private static class RetrieveTask extends AsyncTask<Void,Void,Location> {
+    /**
+     * Query selected location from database
+     */
+    private static class RetrieveLocation extends AsyncTask<Void,Void,Location> {
 
         private WeakReference<GoogleMapsActivity> activityReference;
         private String locationId;
 
         // only retain a weak reference to the activity
-        RetrieveTask(GoogleMapsActivity context, String locationId) {
+        RetrieveLocation(GoogleMapsActivity context, String locationId) {
             activityReference = new WeakReference<>(context);
             this.locationId = locationId;
         }

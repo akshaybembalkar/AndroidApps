@@ -18,7 +18,7 @@ public interface LocationDao {
     @Insert
     void insert(Location... location);
 
-    @Delete
-    void delete(Location location);
+    @Query("DELETE FROM Location WHERE location_id = :locationId")
+    void delete(String locationId);
 
 }
